@@ -895,6 +895,7 @@ class FileDragDropWidget(QWidget):
             self.label.setText(f"File: {os.path.basename(self.file_path)}")
             event.acceptProposedAction()
 
+
 class XReservesWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -927,23 +928,25 @@ class XReservesWindow(QMainWindow):
         main_layout.addWidget(title)
         main_layout.addWidget(self.spreads_button)
         main_layout.addWidget(self.reserve_button)
-    
+        
     def calculate_spreads(self):
-        dialog = SpreadsFileDialog(self)
-        if dialog.exec_():
-            # Get the file paths and date
-            first_file = dialog.first_file_path
-            second_file = dialog.second_file_path
-            date = dialog.date_input.date().toString("yyyy-MM-dd")
+    # Show first file dialog
+        first_dialog = FirstFileDialog(self)
+        if first_dialog.exec_():
+            first_file = first_dialog.file_path
+            date = first_dialog.date_input.date().toString("yyyy-MM-dd")
             
-            # Placeholder for your spreads calculation function
-            # Replace with your actual function call
-            QMessageBox.information(self, "Processing", 
-                                  f"Calculating spreads...\n"
-                                  f"First file: {os.path.basename(first_file)}\n"
-                                  f"Second file: {os.path.basename(second_file)}\n"
-                                  f"Date: {date}")
-    
+            # Show second file dialog
+            second_dialog = SecondFileDialog(self)
+            if second_dialog.exec_():
+                second_file = second_dialog.file_path
+                
+                # Your spreads calculation function will go here
+                QMessageBox.information(self, "Processing", 
+                                    f"Calculating spreads...\n"
+                                    f"First file: {os.path.basename(first_file)}\n"
+                                    f"Second file: {os.path.basename(second_file)}\n"
+                                    f"Date: {date}")
     def show_reserve_window(self):
         self.reserve_window = XReservesAllocationWindow()
         self.reserve_window.show()
@@ -1038,11 +1041,14 @@ class SpreadsFileDialog(QDialog):
         
         self.accept()
 
+
 class XReservesAllocationWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.init_ui()
-        self.data_entries = {}
+        self.data_entries = {
+            'tables': [None] * 7  # 2 mandatory + 5 optional tables
+        }
         self.default_data_path = "default_tables.xlsx"
         
     def init_ui(self):
@@ -1062,15 +1068,14 @@ class XReservesAllocationWindow(QMainWindow):
         title.setStyleSheet("font-size: 20px; font-weight: bold;")
         
         # Process button
-        self.process_button = QPushButton("Process Data")
+        self.process_button = QPushButton("Start Process")
         self.process_button.clicked.connect(self.start_process_sequence)
         
-        # Table for displaying input data
+        # Table for displaying status
         self.input_table = QTableWidget()
-        self.input_table.setColumnCount(7)
+        self.input_table.setColumnCount(3)
         self.input_table.setHorizontalHeaderLabels([
-            "File Path", "Date", "Adjustment 1", "Adjustment 2", 
-            "Tables Imported", "Status", "Result"
+            "Tables", "Status", "Result"
         ])
         self.input_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         
@@ -1078,7 +1083,110 @@ class XReservesAllocationWindow(QMainWindow):
         main_layout.addWidget(title)
         main_layout.addWidget(self.process_button)
         main_layout.addWidget(self.input_table)
-
+    
+    def start_process_sequence(self):
+        # Reset data
+        self.data_entries['tables'] = [None] * 7
+        
+        # Show first mandatory table dialog
+        self.current_row = self.input_table.rowCount()
+        self.input_table.insertRow(self.current_row)
+        self.input_table.setItem(self.current_row, 0, QTableWidgetItem("Mandatory Tables"))
+        self.input_table.setItem(self.current_row, 1, QTableWidgetItem("Processing..."))
+        
+        self.show_mandatory_table1_dialog()
+    
+    def show_mandatory_table1_dialog(self):
+        dialog = XReservesTableDialog(self, table_number=1, is_mandatory=True)
+        if dialog.exec_():
+            if dialog.table_data:
+                try:
+                    pandas_df = pd.read_clipboard(sep='\t')
+                    pl_df = pl.from_pandas(pandas_df)
+                    self.data_entries['tables'][0] = pl_df
+                    self.show_mandatory_table2_dialog()
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"Failed to parse table data: {str(e)}")
+                    self.show_mandatory_table1_dialog()
+            else:
+                QMessageBox.warning(self, "Warning", "No table data provided")
+                self.show_mandatory_table1_dialog()
+        else:
+            self.input_table.setItem(self.current_row, 1, QTableWidgetItem("Cancelled"))
+    
+    def show_mandatory_table2_dialog(self):
+        dialog = XReservesTableDialog(self, table_number=2, is_mandatory=True)
+        if dialog.exec_():
+            if dialog.table_data:
+                try:
+                    pandas_df = pd.read_clipboard(sep='\t')
+                    pl_df = pl.from_pandas(pandas_df)
+                    self.data_entries['tables'][1] = pl_df
+                    self.show_remaining_tables_dialog()
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"Failed to parse table data: {str(e)}")
+                    self.show_mandatory_table2_dialog()
+            else:
+                QMessageBox.warning(self, "Warning", "No table data provided")
+                self.show_mandatory_table2_dialog()
+        else:
+            self.input_table.setItem(self.current_row, 1, QTableWidgetItem("Cancelled"))
+    
+    def show_remaining_tables_dialog(self):
+        try:
+            # Load default data for remaining tables
+            self.load_default_tables()
+            
+            # Show dialog for remaining tables
+            dialog = XReservesRemainingTablesDialog(self, self.data_entries['tables'][2:])
+            if dialog.exec_():
+                # Update tables with any changes
+                for i, table in enumerate(dialog.tables):
+                    self.data_entries['tables'][i+2] = table
+                
+                # Save modified default tables
+                self.save_default_tables(dialog.modified_tables)
+                
+                # Update status
+                self.input_table.setItem(self.current_row, 1, QTableWidgetItem("Completed"))
+                
+                # Process the allocation
+                self.process_allocation()
+            else:
+                self.input_table.setItem(self.current_row, 1, QTableWidgetItem("Cancelled"))
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error with tables: {str(e)}")
+            self.input_table.setItem(self.current_row, 1, QTableWidgetItem("Failed"))
+    
+    def load_default_tables(self):
+        """Load default data for optional tables from Excel file"""
+        if os.path.exists(self.default_data_path):
+            for i in range(5):  # 5 optional tables
+                try:
+                    pandas_df = pd.read_excel(self.default_data_path, sheet_name=f"Table{i+3}")
+                    self.data_entries['tables'][i+2] = pl.from_pandas(pandas_df)
+                except Exception as e:
+                    print(f"Error loading default table {i+3}: {str(e)}")
+                    self.data_entries['tables'][i+2] = pl.DataFrame()
+        else:
+            for i in range(5):
+                self.data_entries['tables'][i+2] = pl.DataFrame()
+    
+    def save_default_tables(self, modified_indices):
+        """Save modified default tables back to Excel"""
+        if modified_indices and os.path.exists(self.default_data_path):
+            with pd.ExcelWriter(self.default_data_path, mode='a', if_sheet_exists='replace') as writer:
+                for i in modified_indices:
+                    pandas_df = self.data_entries['tables'][i+2].to_pandas()
+                    pandas_df.to_excel(writer, sheet_name=f"Table{i+3}", index=False)
+    
+    def process_allocation(self):
+        try:
+            # Your allocation processing function will go here
+            # You can access all tables through self.data_entries['tables']
+            QMessageBox.information(self, "Processing", "Processing allocation with all tables")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Processing error: {str(e)}")
 
 # Class for XReserves table dialog (similar to XIPV)
 class XReservesTableDialog(QDialog):
@@ -1170,14 +1278,13 @@ class XReservesTableDialog(QDialog):
             self.table_data = None
 
 
-
 # Class for remaining XReserves tables dialog (similar to XIPV)
 class XReservesRemainingTablesDialog(QDialog):
     def __init__(self, parent=None, tables=None):
         super().__init__(parent)
         self.setWindowTitle("Remaining XReserves Tables")
         self.setMinimumSize(800, 600)
-        self.tables = tables if tables else [None, None, None, None]
+        self.tables = tables if tables else [None] * 5  # Changed to 5 tables
         self.modified_tables = set()  # Track which tables have been modified
         
         # Main layout
@@ -1185,7 +1292,7 @@ class XReservesRemainingTablesDialog(QDialog):
         
         # Instructions
         instructions = QLabel(
-            "Tables 1 and 2 have been imported. Default data is loaded for Tables 3-4.\n"
+            "Tables 1 and 2 have been imported. Default data is loaded for Tables 3-7.\n"
             "You can view and modify the default data or import new data."
         )
         instructions.setStyleSheet("font-weight: bold;")
@@ -1194,10 +1301,10 @@ class XReservesRemainingTablesDialog(QDialog):
         # Create tab widget for tables
         self.tab_widget = QTabWidget()
         
-        # Add tabs for tables 3-4
-        for i in range(2, 4):
-            tab = self.create_table_tab(i+1, self.tables[i])
-            self.tab_widget.addTab(tab, f"Table {i+1}")
+        # Add tabs for tables 3-7 (5 tables)
+        for i in range(5):
+            tab = self.create_table_tab(i+3, self.tables[i])
+            self.tab_widget.addTab(tab, f"Table {i+3}")
         
         main_layout.addWidget(self.tab_widget)
         
@@ -1221,13 +1328,13 @@ class XReservesRemainingTablesDialog(QDialog):
         
         # Button to import new data
         import_button = QPushButton(f"Import New Data for Table {table_num}")
-        import_button.clicked.connect(lambda: self.import_new_data(table_num-1))
+        import_button.clicked.connect(lambda: self.import_new_data(table_num-3))  # Adjusted index calculation
         tab_layout.addWidget(import_button)
         
         # Table widget to display/edit data
         table_widget = QTableWidget()
         self.populate_table_widget(table_widget, table_data)
-        table_widget.itemChanged.connect(lambda: self.handle_table_edit(table_num-1, table_widget))
+        table_widget.itemChanged.connect(lambda: self.handle_table_edit(table_num-3, table_widget))  # Adjusted index calculation
         
         tab_layout.addWidget(QLabel("Default Data (editable):"))
         tab_layout.addWidget(table_widget)
@@ -1265,7 +1372,7 @@ class XReservesRemainingTablesDialog(QDialog):
     
     def import_new_data(self, table_index):
         """Import new data for a table"""
-        dialog = XReservesTableDialog(self, table_number=table_index+1)
+        dialog = XReservesTableDialog(self, table_number=table_index+3)  # Adjusted table number
         if dialog.exec_():
             table_data = dialog.table_data
             if table_data:
@@ -1279,13 +1386,13 @@ class XReservesRemainingTablesDialog(QDialog):
                     self.tables[table_index] = pl_df
                     
                     # Update UI
-                    table_widget = getattr(self, f"table{table_index+1}_widget")
+                    table_widget = getattr(self, f"table{table_index+3}_widget")  # Adjusted attribute name
                     self.populate_table_widget(table_widget, pl_df)
                     
                     # Mark as modified
                     self.modified_tables.add(table_index)
                     
-                    QMessageBox.information(self, "Success", f"New data imported for Table {table_index+1}")
+                    QMessageBox.information(self, "Success", f"New data imported for Table {table_index+3}")  # Adjusted table number
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Failed to parse table data: {str(e)}")
     
@@ -1358,6 +1465,130 @@ class YReservesWindow(QMainWindow):
         
         QMessageBox.information(self, "Processing", "YReserves processing initiated")
 
+class FirstFileDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Load First File")
+        self.setMinimumWidth(600)
+        self.setMinimumHeight(400)
+        self.file_path = None
+        
+        layout = QVBoxLayout()
+        
+        # File section
+        file_group = QGroupBox("Select First File")
+        file_layout = QVBoxLayout()
+        
+        # Drag-drop area
+        self.drag_drop = FileDragDropWidget()
+        
+        # Browse button
+        self.browse_button = QPushButton("Browse")
+        self.browse_button.clicked.connect(self.browse_file)
+        
+        file_layout.addWidget(self.drag_drop)
+        file_layout.addWidget(self.browse_button)
+        file_group.setLayout(file_layout)
+        
+        # Date input
+        date_layout = QHBoxLayout()
+        self.date_input = QDateEdit()
+        self.date_input.setDate(QDate.currentDate())
+        self.date_input.setCalendarPopup(True)
+        date_layout.addWidget(QLabel("Date:"))
+        date_layout.addWidget(self.date_input)
+        
+        # Buttons
+        button_box = QHBoxLayout()
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.clicked.connect(self.reject)
+        self.next_button = QPushButton("Next")
+        self.next_button.clicked.connect(self.validate_and_accept)
+        
+        button_box.addWidget(self.cancel_button)
+        button_box.addWidget(self.next_button)
+        
+        # Add all widgets to main layout
+        layout.addWidget(file_group)
+        layout.addLayout(date_layout)
+        layout.addLayout(button_box)
+        
+        self.setLayout(layout)
+    
+    def browse_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select File", "", "Excel Files (*.xlsx *.xls);;CSV Files (*.csv);;All Files (*)"
+        )
+        if file_path:
+            self.file_path = file_path
+            self.drag_drop.label.setText(f"File: {os.path.basename(file_path)}")
+    
+    def validate_and_accept(self):
+        self.file_path = getattr(self.drag_drop, 'file_path', None)
+        
+        if not self.file_path:
+            QMessageBox.warning(self, "Warning", "Please select a file.")
+            return
+        
+        self.accept()
+
+class SecondFileDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Load Second File")
+        self.setMinimumWidth(600)
+        self.setMinimumHeight(400)
+        self.file_path = None
+        
+        layout = QVBoxLayout()
+        
+        # File section
+        file_group = QGroupBox("Select Second File")
+        file_layout = QVBoxLayout()
+        
+        # Drag-drop area
+        self.drag_drop = FileDragDropWidget()
+        
+        # Browse button
+        self.browse_button = QPushButton("Browse")
+        self.browse_button.clicked.connect(self.browse_file)
+        
+        file_layout.addWidget(self.drag_drop)
+        file_layout.addWidget(self.browse_button)
+        file_group.setLayout(file_layout)
+        
+        # Buttons
+        button_box = QHBoxLayout()
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.clicked.connect(self.reject)
+        self.calculate_button = QPushButton("Calculate")
+        self.calculate_button.clicked.connect(self.validate_and_accept)
+        
+        button_box.addWidget(self.cancel_button)
+        button_box.addWidget(self.calculate_button)
+        
+        # Add all widgets to main layout
+        layout.addWidget(file_group)
+        layout.addLayout(button_box)
+        
+        self.setLayout(layout)
+    
+    def browse_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select File", "", "Excel Files (*.xlsx *.xls);;CSV Files (*.csv);;All Files (*)"
+        )
+        if file_path:
+            self.file_path = file_path
+            self.drag_drop.label.setText(f"File: {os.path.basename(file_path)}")
+    
+    def validate_and_accept(self):
+        self.file_path = getattr(self.drag_drop, 'file_path', None)
+        
+        if not self.file_path:
+            QMessageBox.warning(self, "Warning", "Please select a file.")
+            return
+        
+        self.accept()
 
 # Main entry point
 if __name__ == "__main__":
