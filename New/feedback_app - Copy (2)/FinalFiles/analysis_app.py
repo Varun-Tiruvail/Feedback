@@ -525,6 +525,68 @@ class AnalysisApp(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Error updating overall analysis: {str(e)}")
 
+    # def update_section_analysis(self, category):
+    #     if self.merged_data is None:
+    #         return
+        
+    #     try:
+    #         self.section_canvas.axes.clear()
+            
+    #         category_data = self.merged_data[self.merged_data['Category'] == category]
+            
+    #         if category_data.empty:
+    #             self.section_canvas.axes.text(0.5, 0.5, f"No data for {category} category",
+    #                                         ha='center', va='center')
+    #             self.section_canvas.draw()
+    #             return
+            
+    #         question_scores = category_data.groupby(['QuestionID', 'Question'])['response_value'].mean()
+            
+    #         questions = [q[1] for q in question_scores.index]
+    #         shortened_questions = [q[:20] + '...' if len(q) > 20 else q for q in questions]
+            
+    #         colors = cm.viridis(np.linspace(0.2, 0.8, len(question_scores)))
+    #         bars = self.section_canvas.axes.bar(range(len(shortened_questions)), question_scores.values, color=colors)
+    #         beautify_charts(self.section_canvas.axes, 
+    #                       f"{category} Category - {'Team' if self.viewing_team_data else 'My'} Scores", 
+    #                       ylabel='Average Score (1-4)')
+            
+    #         self.section_canvas.axes.set_ylim(0, 4)
+    #         self.section_canvas.axes.set_xticks(range(len(shortened_questions)))
+    #         self.section_canvas.axes.set_xticklabels(shortened_questions, rotation=45, ha='right')
+            
+    #         self.section_canvas.bar_labels = questions
+    #         self.section_canvas.bars = bars
+            
+    #         self.section_canvas.annot = self.section_canvas.axes.annotate("", xy=(0,0), xytext=(20,20),
+    #                                textcoords="offset points",
+    #                                bbox=dict(boxstyle="round", fc="white", alpha=0.8),
+    #                                arrowprops=dict(arrowstyle="->"))
+    #         self.section_canvas.annot.set_visible(False)
+            
+    #         def hover(event):
+    #             if not event.inaxes:
+    #                 return
+
+    #             for i, bar in enumerate(bars):
+    #                 if bar.contains_point([event.x, event.y]):
+    #                     self.section_canvas.annot.set_visible(True)
+    #                     self.section_canvas.annot.set_text(f"{questions[i]}\nScore: {question_scores.values[i]:.2f}")
+    #                     self.section_canvas.annot.xy = (bar.get_x() + bar.get_width() / 2, bar.get_height())
+    #                     self.section_canvas.draw_idle()
+    #                     return
+
+    #             self.section_canvas.annot.set_visible(False)
+    #             self.section_canvas.draw_idle()
+            
+    #         self.section_canvas.hover = hover
+    #         self.section_canvas.fig.canvas.mpl_connect("motion_notify_event", self.section_canvas.hover)
+            
+    #         self.section_canvas.fig.tight_layout()
+    #         self.section_canvas.draw()
+    #     except Exception as e:
+    #         QMessageBox.warning(self, "Error", f"Error updating section analysis: {str(e)}")
+
     def update_section_analysis(self, category):
         if self.merged_data is None:
             return
@@ -542,14 +604,17 @@ class AnalysisApp(QDialog):
             
             question_scores = category_data.groupby(['QuestionID', 'Question'])['response_value'].mean()
             
+            # Calculate average of all questions in this section
+            section_average = question_scores.mean()
+            
             questions = [q[1] for q in question_scores.index]
             shortened_questions = [q[:20] + '...' if len(q) > 20 else q for q in questions]
             
             colors = cm.viridis(np.linspace(0.2, 0.8, len(question_scores)))
             bars = self.section_canvas.axes.bar(range(len(shortened_questions)), question_scores.values, color=colors)
             beautify_charts(self.section_canvas.axes, 
-                          f"{category} Category - {'Team' if self.viewing_team_data else 'My'} Scores", 
-                          ylabel='Average Score (1-4)')
+                        f"{category} Category - {'Team' if self.viewing_team_data else 'My'} Scores\nSection Average: {section_average:.2f}", 
+                        ylabel='Average Score (1-4)')
             
             self.section_canvas.axes.set_ylim(0, 4)
             self.section_canvas.axes.set_xticks(range(len(shortened_questions)))
@@ -559,9 +624,9 @@ class AnalysisApp(QDialog):
             self.section_canvas.bars = bars
             
             self.section_canvas.annot = self.section_canvas.axes.annotate("", xy=(0,0), xytext=(20,20),
-                                   textcoords="offset points",
-                                   bbox=dict(boxstyle="round", fc="white", alpha=0.8),
-                                   arrowprops=dict(arrowstyle="->"))
+                                textcoords="offset points",
+                                bbox=dict(boxstyle="round", fc="white", alpha=0.8),
+                                arrowprops=dict(arrowstyle="->"))
             self.section_canvas.annot.set_visible(False)
             
             def hover(event):
@@ -586,7 +651,7 @@ class AnalysisApp(QDialog):
             self.section_canvas.draw()
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Error updating section analysis: {str(e)}")
-    
+
     def update_question_analysis(self, question_text):
         if self.merged_data is None or not question_text:
             return

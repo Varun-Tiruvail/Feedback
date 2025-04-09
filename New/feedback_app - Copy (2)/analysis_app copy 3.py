@@ -710,146 +710,6 @@ class AnalysisApp(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Error updating overall analysis: {str(e)}")
 
-    # def update_section_analysis(self, category):
-    #     if self.merged_data is None:
-    #         return
-        
-    #     try:
-    #         self.section_canvas.axes.clear()
-            
-    #         category_data = self.merged_data[self.merged_data['Category'] == category]
-            
-    #         if category_data.empty:
-    #             self.section_canvas.axes.text(0.5, 0.5, f"No data for {category} category",
-    #                                         ha='center', va='center')
-    #             self.section_canvas.draw()
-    #             return
-            
-    #         question_scores = category_data.groupby(['QuestionID', 'Question'])['response_value'].mean()
-            
-    #         # Calculate average of all questions in this section
-    #         section_average = question_scores.mean()
-            
-    #         questions = [q[1] for q in question_scores.index]
-    #         shortened_questions = [q[:20] + '...' if len(q) > 20 else q for q in questions]
-            
-    #         colors = cm.viridis(np.linspace(0.2, 0.8, len(question_scores)))
-    #         bars = self.section_canvas.axes.bar(range(len(shortened_questions)), question_scores.values, color=colors)
-    #         beautify_charts(self.section_canvas.axes, 
-    #                     f"{category} Category - {'Team' if self.viewing_team_data else 'My'} Scores\nSection Average: {section_average:.2f}", 
-    #                     ylabel='Average Score (1-4)')
-            
-    #         self.section_canvas.axes.set_ylim(0, 4)
-    #         self.section_canvas.axes.set_xticks(range(len(shortened_questions)))
-    #         self.section_canvas.axes.set_xticklabels(shortened_questions, rotation=45, ha='right')
-            
-    #         self.section_canvas.bar_labels = questions
-    #         self.section_canvas.bars = bars
-            
-    #         self.section_canvas.annot = self.section_canvas.axes.annotate("", xy=(0,0), xytext=(20,20),
-    #                             textcoords="offset points",
-    #                             bbox=dict(boxstyle="round", fc="white", alpha=0.8),
-    #                             arrowprops=dict(arrowstyle="->"))
-    #         self.section_canvas.annot.set_visible(False)
-            
-    #         def hover(event):
-    #             if not event.inaxes:
-    #                 return
-
-    #             for i, bar in enumerate(bars):
-    #                 if bar.contains_point([event.x, event.y]):
-    #                     self.section_canvas.annot.set_visible(True)
-    #                     self.section_canvas.annot.set_text(f"{questions[i]}\nScore: {question_scores.values[i]:.2f}")
-    #                     self.section_canvas.annot.xy = (bar.get_x() + bar.get_width() / 2, bar.get_height())
-    #                     self.section_canvas.draw_idle()
-    #                     return
-
-    #             self.section_canvas.annot.set_visible(False)
-    #             self.section_canvas.draw_idle()
-            
-    #         self.section_canvas.hover = hover
-    #         self.section_canvas.fig.canvas.mpl_connect("motion_notify_event", self.section_canvas.hover)
-            
-    #         self.section_canvas.fig.tight_layout()
-    #         self.section_canvas.draw()
-    #     except Exception as e:
-    #         QMessageBox.warning(self, "Error", f"Error updating section analysis: {str(e)}")
-
-    # def update_question_analysis(self, question_text):
-    #     if self.merged_data is None or not question_text:
-    #         return
-        
-    #     try:
-    #         question_id = self.question_combo.currentData()
-    #         self.question_canvas.axes.clear()
-            
-    #         question_data = self.merged_data[self.merged_data['QuestionID'] == question_id]
-            
-    #         if question_data.empty:
-    #             self.question_canvas.axes.text(0.5, 0.5, "No data for this question",
-    #                                          ha='center', va='center')
-    #             self.question_canvas.draw()
-    #             return
-            
-    #         option_counts = question_data['response_value'].value_counts().sort_index()
-            
-    #         option_labels = []
-    #         for i in range(1, 5):
-    #             col_name = f'Option{i}'
-    #             option_text = question_data[col_name].iloc[0] if not question_data.empty else f"Option {i}"
-    #             option_labels.append(f"{i}: {option_text}")
-            
-    #         all_options = pd.Series([0, 0, 0, 0], index=[1, 2, 3, 4])
-    #         for idx, count in option_counts.items():
-    #             if idx > 0 and idx <= 4:
-    #                 all_options[idx] = count
-            
-    #         if all_options.sum() == 0:
-    #             self.question_canvas.axes.text(0.5, 0.5, "No responses for this question",
-    #                                          ha='center', va='center')
-    #             self.question_canvas.draw()
-    #         else:
-    #             wedges, _ = self.question_canvas.axes.pie(
-    #                 all_options, 
-    #                 labels=None,
-    #                 autopct=None,
-    #                 startangle=90,
-    #                 explode=[0.05, 0.05, 0.05, 0.05],
-    #                 shadow=True,
-    #                 wedgeprops={'linewidth': 1, 'edgecolor': 'white'},
-    #                 colors=cm.viridis(np.linspace(0.2, 0.8, 4))
-    #             )
-                
-    #             self.question_canvas.pie_wedges = wedges
-                
-    #             total = all_options.sum()
-    #             detailed_labels = []
-    #             for i, (label, count) in enumerate(zip(option_labels, all_options)):
-    #                 percentage = (count / total) * 100 if total > 0 else 0
-    #                 detailed_labels.append(f"{label}\nCount: {count}\n({percentage:.1f}%)")
-                
-    #             self.question_canvas.pie_labels = detailed_labels
-                
-    #             self.question_canvas.axes.set_title(
-    #                 f"{'Team' if self.viewing_team_data else 'My'} Responses: {question_text}"
-    #             )
-    #             self.question_canvas.axes.legend(wedges, option_labels, title="Options", 
-    #                                            loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
-                
-    #             self.question_canvas.axes.axis('equal')
-                
-    #             self.question_canvas.annot = self.question_canvas.axes.annotate("", xy=(0,0), xytext=(20,20),
-    #                                        textcoords="offset points",
-    #                                        bbox=dict(boxstyle="round", fc="white", alpha=0.8),
-    #                                        arrowprops=dict(arrowstyle="->"))
-    #             self.question_canvas.annot.set_visible(False)
-                
-    #             self.question_canvas.fig.tight_layout()
-                
-    #         self.question_canvas.draw()
-    #     except Exception as e:
-    #         QMessageBox.warning(self, "Error", f"Error updating question analysis: {str(e)}")
-
     def update_section_analysis(self, category):
         if self.merged_data is None:
             return
@@ -857,59 +717,58 @@ class AnalysisApp(QDialog):
         try:
             self.section_canvas.axes.clear()
             
-            # Split data into direct (you) and indirect (team)
-            your_data = self.merged_data[self.merged_data['db_file'].str.contains(self.current_user)]
-            team_data = self.merged_data[~self.merged_data['db_file'].str.contains(self.current_user)]
+            category_data = self.merged_data[self.merged_data['Category'] == category]
             
-            # Get your scores
-            your_scores = your_data[your_data['Category'] == category].groupby(
-                ['QuestionID', 'Question'])['response_value'].mean()
+            if category_data.empty:
+                self.section_canvas.axes.text(0.5, 0.5, f"No data for {category} category",
+                                            ha='center', va='center')
+                self.section_canvas.draw()
+                return
             
-            # Get team scores
-            team_scores = team_data[team_data['Category'] == category].groupby(
-                ['QuestionID', 'Question'])['response_value'].mean()
+            question_scores = category_data.groupby(['QuestionID', 'Question'])['response_value'].mean()
             
-            # Align scores
-            questions = list(set(your_scores.index.tolist() + team_scores.index.tolist()))
-            questions.sort()  # Sort by QuestionID
+            # Calculate average of all questions in this section
+            section_average = question_scores.mean()
             
-            # Calculate averages
-            your_avg = your_scores.mean() if not your_scores.empty else 0
-            team_avg = team_scores.mean() if not team_scores.empty else 0
+            questions = [q[1] for q in question_scores.index]
+            shortened_questions = [q[:20] + '...' if len(q) > 20 else q for q in questions]
             
-            # Plot setup
-            width = 0.35
-            x = np.arange(len(questions))
-            
-            # Plot bars
-            your_bars = []
-            team_bars = []
-            question_labels = []
-            
-            for i, (qid, qtext) in enumerate(questions):
-                your_val = your_scores.get((qid, qtext), 0)
-                team_val = team_scores.get((qid, qtext), 0)
-                
-                your_bars.append(self.section_canvas.axes.bar(
-                    x[i] - width/2, your_val, width, color='#1f77b4'))
-                team_bars.append(self.section_canvas.axes.bar(
-                    x[i] + width/2, team_val, width, color='#ff7f0e'))
-                
-                question_labels.append(qtext[:20] + '...' if len(qtext) > 20 else qtext)
-            
-            beautify_charts(self.section_canvas.axes,
-                        f"{category} Category\nDirect Avg: {your_avg:.2f}, Indirect Avg: {team_avg:.2f}",
+            colors = cm.viridis(np.linspace(0.2, 0.8, len(question_scores)))
+            bars = self.section_canvas.axes.bar(range(len(shortened_questions)), question_scores.values, color=colors)
+            beautify_charts(self.section_canvas.axes, 
+                        f"{category} Category - {'Team' if self.viewing_team_data else 'My'} Scores\nSection Average: {section_average:.2f}", 
                         ylabel='Average Score (1-4)')
             
-            self.section_canvas.axes.set_xticks(x)
-            self.section_canvas.axes.set_xticklabels(question_labels, rotation=45, ha='right')
-            self.section_canvas.axes.legend(['Direct (You)', 'Indirect (Team)'], loc='upper right')
+            self.section_canvas.axes.set_ylim(0, 4)
+            self.section_canvas.axes.set_xticks(range(len(shortened_questions)))
+            self.section_canvas.axes.set_xticklabels(shortened_questions, rotation=45, ha='right')
             
-            # Add hover functionality for both bar types
-            self.section_canvas.bar_data = {
-                'your': {'bars': your_bars, 'scores': your_scores},
-                'team': {'bars': team_bars, 'scores': team_scores}
-            }
+            self.section_canvas.bar_labels = questions
+            self.section_canvas.bars = bars
+            
+            self.section_canvas.annot = self.section_canvas.axes.annotate("", xy=(0,0), xytext=(20,20),
+                                textcoords="offset points",
+                                bbox=dict(boxstyle="round", fc="white", alpha=0.8),
+                                arrowprops=dict(arrowstyle="->"))
+            self.section_canvas.annot.set_visible(False)
+            
+            def hover(event):
+                if not event.inaxes:
+                    return
+
+                for i, bar in enumerate(bars):
+                    if bar.contains_point([event.x, event.y]):
+                        self.section_canvas.annot.set_visible(True)
+                        self.section_canvas.annot.set_text(f"{questions[i]}\nScore: {question_scores.values[i]:.2f}")
+                        self.section_canvas.annot.xy = (bar.get_x() + bar.get_width() / 2, bar.get_height())
+                        self.section_canvas.draw_idle()
+                        return
+
+                self.section_canvas.annot.set_visible(False)
+                self.section_canvas.draw_idle()
+            
+            self.section_canvas.hover = hover
+            self.section_canvas.fig.canvas.mpl_connect("motion_notify_event", self.section_canvas.hover)
             
             self.section_canvas.fig.tight_layout()
             self.section_canvas.draw()
@@ -921,161 +780,72 @@ class AnalysisApp(QDialog):
             return
         
         try:
-            self.question_canvas.axes.clear()
             question_id = self.question_combo.currentData()
+            self.question_canvas.axes.clear()
             
-            # Split data into direct (you) and indirect (team)
-            your_data = self.merged_data[
-                (self.merged_data['db_file'].str.contains(self.current_user)) &
-                (self.merged_data['QuestionID'] == question_id)
-            ]
-            team_data = self.merged_data[
-                (~self.merged_data['db_file'].str.contains(self.current_user)) &
-                (self.merged_data['QuestionID'] == question_id)
-            ]
+            question_data = self.merged_data[self.merged_data['QuestionID'] == question_id]
             
-            # Create subplots for side-by-side pie charts
-            self.question_canvas.fig.clf()
-            ax1 = self.question_canvas.fig.add_subplot(121)
-            ax2 = self.question_canvas.fig.add_subplot(122)
+            if question_data.empty:
+                self.question_canvas.axes.text(0.5, 0.5, "No data for this question",
+                                             ha='center', va='center')
+                self.question_canvas.draw()
+                return
             
-            # Plot your pie chart
-            self.plot_pie_chart(ax1, your_data, "Your Responses")
-            # Plot team pie chart
-            self.plot_pie_chart(ax2, team_data, "Team Responses")
+            option_counts = question_data['response_value'].value_counts().sort_index()
             
-            # Add common legend
-            handles, labels = ax1.get_legend_handles_labels()
-            self.question_canvas.fig.legend(handles, labels, 
-                                        title="Options",
-                                        loc='lower center',
-                                        ncol=4,
-                                        bbox_to_anchor=(0.5, -0.05))
+            option_labels = []
+            for i in range(1, 5):
+                col_name = f'Option{i}'
+                option_text = question_data[col_name].iloc[0] if not question_data.empty else f"Option {i}"
+                option_labels.append(f"{i}: {option_text}")
             
-            self.question_canvas.fig.suptitle(
-                f"Question Analysis: {question_text}", 
-                y=1.02,
-                fontsize=14,
-                fontweight='bold'
-            )
-            self.question_canvas.fig.tight_layout()
+            all_options = pd.Series([0, 0, 0, 0], index=[1, 2, 3, 4])
+            for idx, count in option_counts.items():
+                if idx > 0 and idx <= 4:
+                    all_options[idx] = count
+            
+            if all_options.sum() == 0:
+                self.question_canvas.axes.text(0.5, 0.5, "No responses for this question",
+                                             ha='center', va='center')
+                self.question_canvas.draw()
+            else:
+                wedges, _ = self.question_canvas.axes.pie(
+                    all_options, 
+                    labels=None,
+                    autopct=None,
+                    startangle=90,
+                    explode=[0.05, 0.05, 0.05, 0.05],
+                    shadow=True,
+                    wedgeprops={'linewidth': 1, 'edgecolor': 'white'},
+                    colors=cm.viridis(np.linspace(0.2, 0.8, 4))
+                )
+                
+                self.question_canvas.pie_wedges = wedges
+                
+                total = all_options.sum()
+                detailed_labels = []
+                for i, (label, count) in enumerate(zip(option_labels, all_options)):
+                    percentage = (count / total) * 100 if total > 0 else 0
+                    detailed_labels.append(f"{label}\nCount: {count}\n({percentage:.1f}%)")
+                
+                self.question_canvas.pie_labels = detailed_labels
+                
+                self.question_canvas.axes.set_title(
+                    f"{'Team' if self.viewing_team_data else 'My'} Responses: {question_text}"
+                )
+                self.question_canvas.axes.legend(wedges, option_labels, title="Options", 
+                                               loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
+                
+                self.question_canvas.axes.axis('equal')
+                
+                self.question_canvas.annot = self.question_canvas.axes.annotate("", xy=(0,0), xytext=(20,20),
+                                           textcoords="offset points",
+                                           bbox=dict(boxstyle="round", fc="white", alpha=0.8),
+                                           arrowprops=dict(arrowstyle="->"))
+                self.question_canvas.annot.set_visible(False)
+                
+                self.question_canvas.fig.tight_layout()
+                
             self.question_canvas.draw()
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Error updating question analysis: {str(e)}")
-
-    # def plot_pie_chart(self, ax, data, title):
-    #     """Helper function to plot individual pie charts"""
-    #     option_counts = data['response_value'].value_counts().sort_index()
-    #     all_options = pd.Series([0]*4, index=[1,2,3,4])
-        
-    #     for idx, count in option_counts.items():
-    #         if 1 <= idx <= 4:
-    #             all_options[idx] = count
-        
-    #     # Get option labels from questions_df
-    #     question_row = self.questions_df[self.questions_df['QuestionID'] == data['QuestionID'].iloc[0]]
-    #     option_labels = [question_row[f'Option{i}'].values[0] for i in range(1,5)]
-        
-    #     wedges, _, autotexts = ax.pie(
-    #         all_options,
-    #         labels=None,
-    #         autopct='%1.1f%%',
-    #         startangle=90,
-    #         colors=cm.viridis(np.linspace(0.2, 0.8, 4)),
-    #         wedgeprops={'linewidth': 1, 'edgecolor': 'white'},
-    #         textprops={'color': 'white', 'fontweight': 'bold'}
-    #     )
-        
-    #     # Beautify
-    #     ax.set_title(title, fontsize=12, fontweight='bold')
-    #     ax.axis('equal')
-        
-    #     # Store hover data
-    #     ax.wedges = wedges
-    #     ax.labels = [f"{i+1}: {option_labels[i]}" for i in range(4)]
-        
-    #     # Connect hover event
-    #     self.question_canvas.mpl_connect("motion_notify_event", 
-    #                                 lambda event: self.pie_hover(event, ax))
-
-    # def pie_hover(self, event, ax):
-    #     """Custom hover function for pie charts"""
-    #     if not event.inaxes == ax:
-    #         ax.annot.set_visible(False)
-    #         self.question_canvas.draw_idle()
-    #         return
-        
-    #     # Convert event coordinates to data space
-    #     for wedge in ax.wedges:
-    #         if wedge.contains_point((event.x, event.y)):
-    #             ax.annot.set_visible(True)
-    #             ax.annot.set_text(ax.labels[ax.wedges.index(wedge)])
-    #             theta = np.pi/2 - (wedge.theta1 + wedge.theta2)/2
-    #             r = wedge.r/2
-    #             x = r * np.cos(theta)
-    #             y = r * np.sin(theta)
-    #             ax.annot.xy = (x, y)
-    #             self.question_canvas.draw_idle()
-    #             return
-        
-    #     ax.anno.set_visible(False)
-    #     self.question_canvas.draw_idle()
-
-    def plot_pie_chart(self, ax, data, title):
-        """Helper function to plot individual pie charts"""
-        # Initialize annotation for this axis
-        ax.annot = ax.annotate("", xy=(0,0), xytext=(20,20),
-                            textcoords="offset points",
-                            bbox=dict(boxstyle="round", fc="white", alpha=0.8),
-                            arrowprops=dict(arrowstyle="->"))
-        ax.annot.set_visible(False)
-
-        option_counts = data['response_value'].value_counts().sort_index()
-        all_options = pd.Series([0]*4, index=[1,2,3,4])
-        
-        for idx, count in option_counts.items():
-            if 1 <= idx <= 4:
-                all_options[idx] = count
-        
-        # Get option labels from questions_df
-        question_row = self.questions_df[self.questions_df['QuestionID'] == data['QuestionID'].iloc[0]]
-        option_labels = [question_row[f'Option{i}'].values[0] for i in range(1,5)]
-        
-        wedges, _, autotexts = ax.pie(
-            all_options,
-            labels=None,
-            autopct='%1.1f%%',
-            startangle=90,
-            colors=cm.viridis(np.linspace(0.2, 0.8, 4)),
-            wedgeprops={'linewidth': 1, 'edgecolor': 'white'},
-            textprops={'color': 'white', 'fontweight': 'bold'}
-        )
-        
-        # Store references
-        ax.wedges = wedges
-        ax.labels = [f"{i+1}: {option_labels[i]}" for i in range(4)]
-        ax.set_title(title, fontsize=12, fontweight='bold')
-        ax.axis('equal')
-
-    def pie_hover(self, event, ax):
-        """Custom hover function for pie charts"""
-        if not event.inaxes == ax:
-            ax.annot.set_visible(False)
-            self.question_canvas.draw_idle()
-            return
-        
-        # Convert event coordinates to data space
-        for wedge in ax.wedges:
-            if wedge.contains_point((event.x, event.y)):
-                ax.annot.set_visible(True)
-                ax.annot.set_text(ax.labels[ax.wedges.index(wedge)])
-                theta = np.pi/2 - (wedge.theta1 + wedge.theta2)/2
-                r = wedge.r/2
-                x = r * np.cos(theta)
-                y = r * np.sin(theta)
-                ax.annot.xy = (x, y)
-                self.question_canvas.draw_idle()
-                return
-        
-        ax.annot.set_visible(False)
-        self.question_canvas.draw_idle()

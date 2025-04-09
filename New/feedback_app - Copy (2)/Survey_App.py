@@ -68,7 +68,8 @@ class SurveyApp(QDialog):
         self.lm_responses = {}
         
         # Create sections (tabs)
-        self.categories = ["Cultural", "Development", "Ways of Working"]
+        # self.categories = ["Cultural", "Development", "Ways of Working"]
+        self.categories = self.questions_df['Category'].unique().tolist()
         
         for category in self.categories:
             scroll = QScrollArea()
