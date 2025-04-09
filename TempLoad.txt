@@ -1,127 +1,96 @@
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-
-def __init__(self, current_user, manager_name):
-    super().__init__()
-    self.current_user = current_user
-    self.manager_name = manager_name
-    self.setWindowTitle(f"Feedback Survey Form - {current_user}")
-    self.resize(1000, 800)  # Increased window size
+def calculate_category_averages(self):
+    """Calculate average scores for each category"""
+    category_averages = {}
     
-    # Load questions from Excel
-    try:
-        self.questions_df = pd.read_excel('survey_questions.xlsx')
-    except FileNotFoundError:
-        QMessageBox.critical(self, "Error", "survey_questions.xlsx file not found!")
-        sys.exit(1)
+    for category in self.categories:
+        # Get all questions in this category
+        category_questions = self.questions_df[self.questions_df['Category'] == category]
+        total_score = 0
+        answered_questions = 0
         
-    # Create main layout
-    main_layout = QHBoxLayout()  # Changed to horizontal layout
+        for q_id in category_questions['QuestionID']:
+            if q_id in self.lm_responses and self.lm_responses[q_id] is not None:
+                total_score += self.lm_responses[q_id]
+                answered_questions += 1
+        
+        # Calculate average if there are answered questions
+        if answered_questions > 0:
+            average = total_score / answered_questions
+            category_averages[category] = round(average, 2)
+        else:
+            category_averages[category] = None
     
-    # Left side: Feedback sections
-    left_panel = QWidget()
-    left_layout = QVBoxLayout(left_panel)
-    
-    # Create feedback type buttons
-    self.feedback_type_layout = QHBoxLayout()
-    self.lm_feedback_btn = QPushButton("LM Feedback")
-    self.general_feedback_btn = QPushButton("General Feedback")
-    
-    self.lm_feedback_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
-    self.general_feedback_btn.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
-    
-    self.feedback_type_layout.addWidget(self.lm_feedback_btn)
-    self.feedback_type_layout.addWidget(self.general_feedback_btn)
-    
-    # Create stacked widget
-    self.stacked_widget = QStackedWidget()
-    self.create_lm_feedback_page()
-    self.create_general_feedback_page()
-    
-    # Submit button
-    self.submit_button = QPushButton("Submit Feedback")
-    self.submit_button.clicked.connect(self.submit_feedback)
-    
-    # Add widgets to left layout
-    left_layout.addLayout(self.feedback_type_layout)
-    left_layout.addWidget(self.stacked_widget)
-    left_layout.addWidget(self.submit_button)
-    
-    # Right side: Persistent analysis panel
-    right_panel = QWidget()
-    right_layout = QVBoxLayout(right_panel)
-    
-    # Analysis title
-    analysis_title = QLabel("Overall Analysis")
-    analysis_title.setStyleSheet("font-size: 14pt; font-weight: bold;")
-    right_layout.addWidget(analysis_title)
-    
-    # Create matplotlib figure
-    self.fig = Figure(figsize=(5, 8), dpi=100)
-    self.canvas = FigureCanvas(self.fig)
-    right_layout.addWidget(self.canvas)
-    
-    # Add to main layout
-    main_layout.addWidget(left_panel, stretch=2)
-    main_layout.addWidget(right_panel, stretch=1)
-    
-    self.setLayout(main_layout)
-    
-    # Initialize analysis
-    self.update_analysis()
-
-def update_analysis(self):
-    """Update the analysis chart with current data"""
-    self.fig.clear()
-    
-    # Calculate your averages
-    your_averages = self.calculate_category_averages()
-    
-    # Get team averages (placeholder - replace with actual data from your DB)
-    team_averages = {
-        cat: 2.5 for cat in self.categories  # Example data - replace with real team averages
-    }
-    
-    # Prepare data for plotting
-    categories = list(your_averages.keys())
-    your_scores = [your_averages[cat] or 0 for cat in categories]
-    team_scores = [team_averages.get(cat, 0) for cat in categories]
-    
-    # Create plot
-    ax = self.fig.add_subplot(111)
-    width = 0.35
-    x = range(len(categories))
-    
-    # Plot bars
-    rects1 = ax.bar([i - width/2 for i in x], your_scores, width, 
-                   label='Your Scores', color='#1f77b4')
-    rects2 = ax.bar([i + width/2 for i in x], team_scores, width, 
-                   label='Team Averages', color='#ff7f0e')
-    
-    # Add labels and formatting
-    ax.set_ylabel('Average Score')
-    ax.set_title('Your Scores vs Team Averages')
-    ax.set_xticks(x)
-    ax.set_xticklabels(categories, rotation=45, ha='right')
-    ax.legend()
-    
-    # Add value labels on top of bars
-    for rect in rects1 + rects2:
-        height = rect.get_height()
-        if height > 0:
-            ax.text(rect.get_x() + rect.get_width()/2., height,
-                   f'{height:.1f}', ha='center', va='bottom')
-    
-    # Adjust layout and draw
-    self.fig.tight_layout()
-    self.canvas.draw()
-
+    return category_averages
 
 def on_lm_radio_toggled(self):
-    """Handle LM feedback radio button selections and update analysis"""
+    """Handle LM feedback radio button selections and update tab averages"""
     sender = self.sender()
     if sender.isChecked():
         _, q_id, value = sender.objectName().split('_')
         self.lm_responses[q_id] = int(value)
         self.update_tab_titles_with_averages()
-        self.update_analysis()  # Refresh the analysis chart
+
+def update_tab_titles_with_averages(self):
+    """Update tab titles to show category averages"""
+    averages = self.calculate_category_averages()
+    
+    for i in range(self.lm_tabs.count()):
+        category = self.categories[i]
+        avg = averages[category]
+        
+        if avg is not None:
+            self.lm_tabs.setTabText(i, f"{category} (Avg: {avg})")
+        else:
+            self.lm_tabs.setTabText(i, f"{category} (No answers)")
+
+def create_lm_feedback_page(self):
+    """Create the tabbed LM feedback interface"""
+    lm_page = QWidget()
+    lm_layout = QVBoxLayout(lm_page)
+    
+    # Create tabs for LM feedback
+    self.lm_tabs = QTabWidget()
+    self.lm_responses = {}
+    
+    # Get unique categories from the Excel file
+    self.categories = self.questions_df['Category'].unique().tolist()
+    
+    for category in self.categories:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        
+        # Filter questions for this category
+        category_questions = self.questions_df[self.questions_df['Category'] == category]
+        
+        for _, row in category_questions.iterrows():
+            q_id = row['QuestionID']
+            question_text = row['Question']
+            
+            group_box = QGroupBox(question_text)
+            group_layout = QVBoxLayout()
+            
+            # Create radio buttons for options
+            option_group = QButtonGroup(self)
+            self.lm_responses[q_id] = None
+            
+            options = [row['Option1'], row['Option2'], row['Option3'], row['Option4']]
+            option_values = [1, 2, 3, 4]  # Numeric values for options
+            
+            for i, (option, value) in enumerate(zip(options, option_values)):
+                radio = QRadioButton(option)
+                radio.setObjectName(f"lm_{q_id}_{value}")
+                radio.toggled.connect(self.on_lm_radio_toggled)
+                option_group.addButton(radio)
+                group_layout.addWidget(radio)
+            
+            group_box.setLayout(group_layout)
+            layout.addWidget(group_box)
+        
+        scroll.setWidget(container)
+        self.lm_tabs.addTab(scroll, f"{category} (No answers)")
+    
+    lm_layout.addWidget(self.lm_tabs)
+    self.stacked_widget.addWidget(lm_page)
